@@ -1,0 +1,520 @@
+---
+title: "Statistical Analysis of US Border Crossings Data"
+output: html_document
+geometry: margin=0in
+---
+
+#### Importing all the required libraries
+```{r}
+
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(stringr)
+library(lubridate)
+library(gridExtra)
+library(scales)
+library(fitdistrplus)
+
+```
+
+#### Reading the dataset
+```{r}
+border_crossings<-read.csv("Border_Crossing_Entry_Data.csv", header=TRUE, sep=',')
+head(border_crossings)
+
+```
+
+#### Selecting only the relevant columns
+```{r}
+
+filtered_data<-subset(border_crossings,select=-Port.Code)
+head(filtered_data)
+
+```
+
+#### Creating separate columns for Month & Year for further processing
+```{r}
+filtered_data$Month<-day(filtered_data$Date)
+filtered_data$Year<-year(filtered_data$Date)
+
+head(filtered_data)
+
+```
+
+#### Finding out the spread across year for our dataset - 1996-2020
+```{r}
+
+years<-unique(filtered_data$Year)
+years
+
+months<-unique(filtered_data$Month)
+months
+
+```
+
+#### Grouping based on Border and Measure to find the individual Frequency count of Inbound Crossings
+```{r}
+
+total_value<-filtered_data%>%
+             group_by(Border,Measure)%>%
+             summarise(Frequency=sum(Value))%>%
+             group_by(Border)%>%
+             summarise(Total=sum(Frequency))%>%
+             arrange(desc(Total))
+total_value
+
+```
+
+### Visualizing the total frequency count of inbound crossings at both the borders
+```{r warning=FALSE}
+
+options(scipen=999)
+
+ggplot(data=total_value,aes(x=reorder(Border,-Total),y=Total,fill=Border))+geom_bar(position="dodge",stat = "identity") + scale_fill_brewer(palette="Dark2") + ggtitle("Frequency of Inbound Crossings between 1996 and 2020") + ylab("Frequency")+xlab("Border")+theme(plot.title = element_text(size = 12,face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))+ theme(axis.text.x = element_text(size=11,face="bold"))+ theme(axis.text.y = element_text(size=11,face="bold"))
+ 
+```
+
+
+#### Checking the frequency count of each Measure at both the borders
+```{r}
+
+total_value_measure<-filtered_data%>%
+             
+  group_by(Border,Measure)%>%
+             summarise(Frequency=sum(Value))%>%
+             arrange(desc(Frequency))
+total_value_measure
+
+```
+
+#### Segregating data for personal modes of transportation 
+```{r warning=FALSE}
+
+total_measures_general<-filtered_data%>%
+             dplyr::filter(Measure %in% c("Personal Vehicle Passengers","Personal Vehicles","Pedestrians"))%>%
+             group_by(Border,Measure)%>%
+             summarise(Frequency=sum(Value))%>%
+             arrange(desc(Frequency))
+
+total_measures_general
+
+```
+
+```{r}
+
+ggplot(data=total_measures_general,aes(y=Frequency,x=reorder(Measure,-Frequency),fill=Border))+geom_bar(stat="identity",position="dodge",color="black")+ggtitle("Frequency of Inbound Crossings by Measure for Personal Modes of Transportation")+ylab("Frequency") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size=11))+ theme(axis.text.y = element_text(size=11))+theme(plot.title = element_text(size = 11,face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))+xlab("Measure")+scale_fill_brewer(palette="Dark2")+ theme(axis.text.x = element_text(size=11,face="bold"))+ theme(axis.text.y = element_text(size=11,face="bold"))
+
+```
+
+#### Segregating data for commerical modes of transportation 
+```{r}
+
+total_measures_commercial<-filtered_data%>%
+             dplyr::filter(!Measure %in% c("Personal Vehicle Passengers","Personal Vehicles","Pedestrians"))%>%
+             group_by(Border,Measure)%>%
+             summarise(Frequency=sum(Value))%>%
+             arrange(desc(Frequency))
+
+ggplot(data=total_measures_commercial,aes(y=Frequency,x=reorder(Measure,-Frequency),fill=Border))+geom_bar(stat="identity",position="dodge",color="black")+ggtitle("Frequency of Inbound Crossings by Measure for Commercial Modes of Transportation")+ylab("Frequency") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+theme(plot.title = element_text(size = 11,face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))+xlab("Measure")+scale_fill_brewer(palette="Dark2")+ theme(axis.text.x = element_text(size=11,face="bold"))+ theme(axis.text.y = element_text(size=11,face="bold"))
+
+```
+
+#### Visual analysis of Yearly trends
+```{r warning=FALSE}
+
+total_value_measure_year<-filtered_data%>%
+             
+  group_by(Border,Year)%>%
+             summarise(Frequency=sum(Value))%>%
+             arrange(desc(Frequency))
+total_value_measure_year
+
+
+ggplot(data=total_value_measure_year,aes(y=Frequency,x=Year))+geom_line(aes(color=Border))+geom_point(aes(color=Border))+ylab("Frequency") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+theme(plot.title = element_text(size = 12,face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))+ scale_x_discrete(limits=c(total_value_measure_year$Year))+scale_color_brewer(palette="Dark2")+ggtitle("Frequency of Inbound Crossings by Border & Year")+ theme(axis.text.x = element_text(size=11,face="bold"))+ theme(axis.text.y = element_text(size=11,face="bold"))
+
+```
+
+#### Visual analysis of Monthly trends
+```{r}
+total_value_measure_month<-filtered_data%>%
+             
+  group_by(Border,Month)%>%
+             summarise(Frequency=sum(Value))%>%
+             arrange(desc(Frequency))
+total_value_measure_month
+
+```
+
+#### Analyzing Frequency of Inbound Crossings by Month & Border - the highest number of inbound crossings at US-Mexico Border were in the month of December & at the US-Canada Border were in the month of August.
+```{r}
+
+ggplot(data=total_value_measure_month,aes(y=Frequency,x=Month,fill=Border))+geom_bar(stat="identity",position="dodge",color="black")+ggtitle("Frequency of Inbound Crossings by Month & Border")+ylab("Frequency") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+theme(plot.title = element_text(size = 12,face="bold"))+
+  theme(plot.title = element_text(hjust = 0.5))+ scale_x_discrete(limits=c(total_value_measure_month$Month))+scale_fill_brewer(palette="Dark2")+ theme(axis.text.x = element_text(size=11,face="bold"))+ theme(axis.text.y = element_text(size=11,face="bold"))
+
+
+```
+
+#### Analyzing frequency of Inbound Crossings by State & Border
+```{r}
+
+total_value_state<-filtered_data%>%
+             group_by(Border,State)%>%
+             summarise(Inbound_Crossings=sum(Value))%>%
+             arrange(desc(Inbound_Crossings))
+
+total_value_state
+
+```
+
+```{r}
+
+ggplot(data=total_value_state,aes(y=Inbound_Crossings,x=reorder(State,-Inbound_Crossings),fill=Border))+geom_bar(stat="identity",color="black")+ggtitle("Frequency of Inbound Crossings by State & Border")+ylab("Frequency") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+theme(plot.title = element_text(size = 12,face="bold"))+theme(plot.title = element_text(hjust = 0.5))+ scale_x_discrete(limits=c(total_value_state$State))+xlab("State")+scale_fill_brewer(palette="Dark2")+ theme(axis.text.x = element_text(size=11,face="bold"))+ theme(axis.text.y = element_text(size=11,face="bold"))
+
+```
+
+#### Conditional Probability
+
+1. What is the probability that a truck entering the US will go to El Paso port given that it is crossing the US-Mexico border?
+
+A = event that a truck has entered visa the US-Mexico Border
+B = event that a truck goes to El Paso
+
+P(𝐵|𝐴) = 𝑃(𝐴∩𝐵) /𝑃(𝐴)
+
+```{r}
+#unique(Mexico$Port.Name)
+
+# Truck entering via US-Mexico Border goes to EL Paso Port
+El_Paso<-subset(filtered_data,(Border=="US-Mexico Border" & Port.Name=="El Paso"& Measure=="Trucks"))
+total_el_paso<-El_Paso%>%group_by(Port.Name)%>%summarise(Total=sum(Value))
+
+# Total trucks entering the US
+Trucks<-subset(filtered_data, Measure=="Trucks")
+total_trucks<-Trucks%>%group_by(Measure)%>%summarise(Total=sum(Value))
+
+#Probability that a truck entering the US will go to El Paso port given that it is crossing the US-Mexico border
+total_el_paso$Total/total_trucks$Total
+
+```
+
+2. What is the probability that a person that has entered the US for a non-business trip via US-Canada Border given that the person is a Pedestrian?
+
+A = event that a person has entered the US on a non-business trip(Bus, Pedestrian, etc.)
+B = event that a person is a Pedestrian amongst all non-business persons
+
+P(𝐵|𝐴) = 𝑃(𝐴∩𝐵) /𝑃(𝐴)
+
+```{r}
+# Total pedestrians entering the US via US-Canada Border
+Pedestrians<-subset(filtered_data, Border=="US-Canada Border" & Measure=="Pedestrians")
+total_pedestrians<-Pedestrians%>%group_by(Measure)%>%summarise(Total=sum(Value))
+
+# Total Pedestrians entering the US regardless of Border
+Total_Pedestrians<-subset(filtered_data, Measure=="Pedestrians")
+total_pedestrians_us<-Total_Pedestrians%>%group_by(Measure)%>%summarise(Total=sum(Value))
+
+#probability that a person entering the US via US-Canada Border is a Pedestrian
+total_pedestrians$Total/total_pedestrians_us$Total
+
+```
+
+
+#### Fitting Distribution - Visualizing the distribution 
+```{r}
+canada_dist <-filtered_data %>%
+              dplyr::filter(Border=="US-Canada Border") %>%
+              group_by(Value) %>%
+              summarise(No_of_Inbound_Crossings_Canada = n())
+              
+canada_dist
+
+ggplot(canada_dist, aes(Value)) +
+geom_histogram(bins = 50, color = 'Black', fill = 'brown')+ggtitle("Distribution of Inbound Crossings at US-Canada Border")+ylab("Frequency")+xlab("No of Inbound Crossings")+scale_fill_brewer(palette="Dark2")+ theme(axis.text.x = element_text(size=11,face="bold"))+ theme(axis.text.y = element_text(size=11,face="bold"))
+
+
+```
+
+```{r}
+mexico_dist <-filtered_data %>%
+              dplyr::filter(Border=="US-Mexico Border") %>%
+              group_by(Value) %>%
+              summarise(No_of_Inbound_Crossings_Mexico = n())
+              
+mexico_dist
+
+ggplot(mexico_dist, aes(Value)) +
+geom_histogram(bins = 50, color = 'Black', fill = 'brown')+ggtitle("Distribution of Inbound Crossings at US-Mexico Border")+ylab("Frequency")+xlab("No of Inbound Crossings")+scale_fill_brewer(palette="Dark2")+ theme(axis.text.x = element_text(size=11,face="bold"))+ theme(axis.text.y = element_text(size=11,face="bold"))
+
+```
+
+#### CANADA BORDER - Negative Binomial distibution 
+```{r}
+fit_nb_can <- fitdist(canada_dist$No_of_Inbound_Crossings_Canada, 'nbinom',discrete = TRUE)
+summary(fit_nb_can)
+```
+
+#### CANADA BORDER - Poisson distribution
+```{r}
+fit_p_can<- fitdist(canada_dist$No_of_Inbound_Crossings_Canada, 'pois',discrete = TRUE) 
+summary(fit_p_can)
+```
+
+#### From the below goodness-of-fit test, and lower AIC and BIC values and higher Loglikelihood,we infer that normal
+distribution is a better fit for the Number of Inbound Crossings variable for US-Canada Border with a µ = 8.257.
+
+```{r}
+
+gofstat(list(fit_nb_can, fit_p_can))
+
+```
+
+#### MEXICO BORDER - Negative Binomial Distribution
+
+```{r}
+
+# Getting the parameter estimates for negative binomial distribution
+fit_nb_mex <- fitdist(mexico_dist$No_of_Inbound_Crossings_Mexico, 'nbinom',discrete = TRUE)
+summary(fit_nb_mex)
+
+```
+
+### MEXICO BORDER - Poisson Distribution
+
+```{r}
+# Getting the parameter estimates for Poisson distribution
+fit_p_mex <- fitdist(mexico_dist$No_of_Inbound_Crossings_Mexico, 'pois',discrete = TRUE) 
+summary(fit_p_mex)
+
+```
+
+#### From the below goodness-of-fit test, and lower AIC and BIC values and higher Loglikelihood,we infer that normal
+distribution is a better fit for the Number of Inbound Crossings variable for US-Mexico Border with a µ = 2.567.
+
+```{r}
+
+# Implementing the goodness-of-fit tests
+gofstat(list(fit_nb_mex, fit_p_mex))
+
+```
+
+### STATISTICAL ANALYSIS
+
+### 1. One sample Z-test : Assuming the entire dataset is the population, we want to test if the mean value of inbound crossings of our sample data is equivalent to the population mean value of inbound crossings. 
+
+#### Population Mean
+```{r}
+cat("Population Mean =" ,mean(filtered_data$Value))
+
+```
+
+X ≡ R.V. of number of inbound crossings in the U.S.
+Null Hypothesis ->      H0: µ = 28302.55 
+Alternate Hypothesis -> H1: µ != 28302.55
+
+#### Performing the One-Sample Z-test
+```{r}
+
+# Step 1: Create a z-test function manually.
+
+##> This function has two input arguments (sample, pop)
+##> The output of this function is the calculated Z_calc and P_value)
+
+# Create the function: one sample z test
+z.test <- function(sample, pop){
+  sample_mean = mean(sample) 
+  pop_mean = mean(pop)
+  n = length(sample) 
+  var = var(pop)
+  z = (sample_mean - pop_mean) / sqrt((var/(n))) 
+  df<-data.frame("Z_calc"=z,"P_value"=pnorm(z))
+  return(df)
+}
+
+
+#Step 2: Create samples
+
+#to return the same data each time we sample it, we need to set the seed to a numerical value
+set.seed(100) 
+
+#sample data
+borderSample <- sample_n(filtered_data, 1000)
+
+
+sample     = borderSample$Value
+population = filtered_data$Value
+
+cat("Sample Mean = ", mean(sample))
+
+# Step 3: Run the test 
+cat(sep="\n")
+z.test(sample, population)
+
+```
+#### Conclusion of One sample Z-test : As P_value < 0.05 we reject the null hypothesis and thus conclude there
+is a significant difference between the sample mean value of inbound crossings and population mean value of inbound crossings.
+
+
+
+
+
+### 2. Two sample Z-test : To test if the mean value of inbound crossings of two different set of samples taken from two different populations is the same or not
+
+X1 ≡ R.V. of inbound crossings in the U.S. from first sample
+X2 ≡ R.V. of inbound crossings in the U.S. from second sample
+
+Null Hypothesis ->      H0: µ1 − µ2 = 0
+Alternate Hypothesis -> H1: µ1 − µ2 != 0
+
+```{r}
+
+# Step 1: Create a two sample z-test function manually.
+
+z_test2 = function(a, b, var_a, var_b){
+  n.a = length(a)
+  n.b = length(b)
+  z = (mean(a) - mean(b)) / (sqrt((var_a)/n.a + (var_b)/n.b))
+  df<-data.frame("Zcal"=z,"P_value"=pnorm(z))
+  return(df)
+}
+
+#Step 2: Create two samples
+
+#to return the same data each time we sample it, we need to set the seed to a numerical value
+set.seed(100)
+# 
+border_1 <- filtered_data[1:181220,] #select all columns and rows from 1 to 181220  
+border_2 <- filtered_data[181221:362440,] #select all columns and rows from 181221 to 362440
+
+border_1_sample <- sample_n(border_1, 10000) #sample 10000 rows from the first population
+border_2_sample <- sample_n(border_2, 10000) #sample 10000 rows from the second population
+
+sample1<-border_1_sample$Value
+# The mean value of inbound crossings of sample 1 is (µ1) = 23701.77
+cat("Sample Mean 1 = ",mean(sample1))
+
+cat(sep="\n")
+sample2<-border_2_sample$Value
+# The mean value of inbound crossings of sample 2 is (µ2) = 32351.66
+cat("Sample Mean 2 = ",mean(sample2))
+
+
+
+var_1<-var(border_1_sample$Value)
+var_2<-var(border_2_sample$Value)
+
+# Step 3: Run the test
+
+cat(sep="\n")
+z_test2(sample1,sample2,var_1,var_2)
+
+```
+#### Conclusion of One sample Z-test : As P_value < 0.05 we reject the null hypothesis and thus conclude there
+is a significant difference between the sample mean value of inbound crossings of the two samples. 
+
+
+
+### 3. Two sample t-test : To test the significance between means of two samples means if populations
+are independent and the variances are unknown, i.e., to test the equality of the mean value of inbound crossings of two random samples generated from the border crossing data.
+
+X1 ≡ R.V. of inbound crossings in the U.S. from first sample
+X2 ≡ R.V. of inbound crossings in the U.S. from second sample
+
+Null Hypothesis ->      H0: µ1 − µ2 != 0
+Alternate Hypothesis -> H1: µ1 − µ2 = 0
+
+```{r}
+
+#Step 1: Create two samples
+
+#to return the same data each time we sample it, we need to set the seed to a numerical value
+set.seed(100)
+
+border_1 <- filtered_data[1:181220,] #select all columns and rows from 1 to 181220  
+border_2 <- filtered_data[181221:362440,] #select all columns and rows from 181221 to 362440
+border_1_sample <- sample_n(border_1, 10000) #sample 10000 rows from the first population
+border_2_sample <- sample_n(border_2, 10000) #sample 10000 rows from the second population
+
+sample1<-border_1_sample$Value
+cat("Sample Mean 1 = ",mean(sample1))
+
+cat(sep="\n")
+sample2<-border_2_sample$Value
+cat("Sample Mean 2 = ",mean(sample2))
+
+#Step - 2 : performing the t test
+
+cat(sep="\n")
+t.test(x=sample1,y=sample2)
+
+
+```
+
+#### Conclusion of Two sample t-test : As P_value > 0.05 we fail to reject the null hypothesis and thus conclude there
+is no significant difference between the sample mean value of inbound crossings of the two samples. 
+
+
+### 4. Two sample proportion test : To test the equality of proportions of inbound bus crossings in New York at US-Canada Border & in Texas at US-Mexico Border in 2020
+
+```{r}
+
+mexico_data<-filtered_data%>%
+             dplyr::filter(Border=="US-Mexico Border")%>%
+             group_by(Border,State,Measure,Year)%>%
+             summarise(Inbound_Crossings=sum(Value))
+mexico_data
+
+canada_data<-filtered_data%>%
+             dplyr::filter(Border=="US-Canada Border")%>%
+             group_by(Border,State,Measure,Year)%>%
+             summarise(Inbound_Crossings=sum(Value))
+ 
+canada_data
+
+```
+
+
+X1 ≡ R.V. of number of inbound bus crossings at US-Canada Border
+X2 ≡ R.V. of number of inbound bus crossings at US-Mexico Border
+
+Null Hypothesis ->      H0: p1 − p2 = 0 
+Alternate Hypothesis -> H1: p1 - p2!= 0
+
+```{r warning=FALSE}
+
+# Proportion inbound buses at US-Canada ==inbound buses at US-Mexico Border
+
+# Step 1-a: Determine the number of inbound buses at US-Canada Border
+n1 <-length(which(canada_data$Measure == "Buses"))
+cat("Number of inbound buses at the US-Canada Border(n1) = ",n1)
+cat(sep="\n")
+
+# Step 1-b: Filter and calculate the number of inbound buses at US-Canada Border in the State of New York in 2020
+x1 <- canada_data %>% dplyr:: filter(Measure == "Buses" , State=="New York") %>% nrow()
+cat("Number of inbound buses at the US-Canada Border in the State of New York in 2020(x1) = ",x1)
+cat(sep="\n")
+
+# Step 1-c: Determine the number of inbound buses at US-Mexico Border
+n2 <-length(which(mexico_data$Measure == "Buses"))
+cat("Number of inbound buses at the US-Mexico Border(n2) = ",n2)
+cat(sep="\n")
+
+# Step 1-d: Filter and calculate the number number of inbound buses at US-Mexico Border in the State of Texas in 2020  
+x2 <- mexico_data %>% dplyr:: filter(Measure == "Buses" , State=="Texas") %>% nrow()
+cat("Number of inbound buses at the US-Mexico Border in the State of Texas in 2020(x2) = ",x2)
+cat(sep="\n")
+
+# step 2: Execute the test
+prop.test(x=c(x1, x2),n=c(n1,n2))
+
+```
+
+#### Conclusion of Two sample proportion test : As P_value < 0.05 we reject the null hypothesis and thus conclude there
+is a significant difference between the proportions of inbound bus crossings in New York at US-Canada Border & in Texas at US-Mexico Border in 2020
+
+
+
